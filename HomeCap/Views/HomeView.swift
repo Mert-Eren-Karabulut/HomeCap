@@ -71,7 +71,7 @@ struct HomeView: View {
 
                         // --- Chart Section ---
                         VStack(alignment: .leading) {
-                            Text("Toplam Tıklanmalar")
+                            Text("Tıklanmalar")
                                 .font(.headline)
                                 .padding(.bottom, 5)
 

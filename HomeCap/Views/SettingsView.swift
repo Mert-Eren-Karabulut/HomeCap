@@ -26,36 +26,16 @@ struct IdentifiableMessage: Identifiable {
 struct SettingsView: View {
     @EnvironmentObject var authManager: AuthManager
 
-    // State for account deletion flow
     @State private var isDeletingAccount = false
-
     @State private var showingWalkthroughSheet = false
     @State private var showingPasswordSheet = false
-    @State private var manageSubErrorItem: IdentifiableError? = nil
     @State private var deletionErrorItem: IdentifiableMessage? = nil
 
     var body: some View {
-        // Keep NavigationStack provided by MainTabView
-        List {  // Use List for standard settings layout
-            Section("Yardım") {  // Section title "Help"
+        List {
+            Section("Yardım") {
                 Button("Nasıl Kullanılır?") {
-                    showingWalkthroughSheet = true  // Set state to show the sheet
-                }
-            }
-
-            Section("Abonelik") {
-                // Optional: Display current status fetched from backend
-                if let user = authManager.currentUser {  // Ensure user exists
-                    HStack {
-                        Text("Mevcut Durum:")
-                        Spacer()
-                        Text(displayTier(user.subscriptionTier))  // Use helper
-                            .foregroundColor(.secondary)
-                    }
-                }
-
-                Button("Aboneliği Yönet") {
-                    manageSubscriptions()
+                    showingWalkthroughSheet = true
                 }
             }
 
@@ -67,14 +47,12 @@ struct SettingsView: View {
 
             Section {
                 Button("Hesabımı Sil", role: .destructive) {
-                    // Reset state and show the password SHEET
-                    isDeletingAccount = false  // Ensure progress view is hidden initially
-                    showingPasswordSheet = true  // Trigger the sheet presentation
+                    isDeletingAccount = false
+                    showingPasswordSheet = true
                 }
-                .disabled(isDeletingAccount)  // Disable if already deleting
+                .disabled(isDeletingAccount)
             }
 
-            // Show progress indicator while deleting
             if isDeletingAccount {
                 Section {
                     HStack {
@@ -86,39 +64,22 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Ayarlar")
-        .alert(item: $manageSubErrorItem) { errorItem in  // errorItem is the non-nil IdentifiableError
-            Alert(
-                title: Text("Hata"),
-                message: Text(
-                    "Abonelik yönetimi sayfası açılamadı: \(errorItem.error.localizedDescription)"
-                ),
-                dismissButton: .default(Text("Tamam")) {
-                    // Action on dismiss if needed, like clearing the state
-                    // manageSubErrorItem = nil // State is automatically set to nil on dismiss
-                }
-            )
-        }
-        // Error Alert for Deletion Failure
-        .alert(item: $deletionErrorItem) { errorItem in  // Binds to Optional<IdentifiableMessage>
+        .alert(item: $deletionErrorItem) { errorItem in
             Alert(
                 title: Text("Hesap Silme Hatası"),
-                message: Text(errorItem.message),  // Display the message from the item
+                message: Text(errorItem.message),
                 dismissButton: .default(Text("Tamam"))
             )
         }
         .sheet(isPresented: $showingPasswordSheet) {
             PasswordPromptSheet { confirmedPassword in
-                // This closure is called when the user taps "Sil Onayla" in the sheet
-                // Directly call the async action with the received password
                 Task {
                     await deleteAccountAction(password: confirmedPassword)
                 }
             }
-            // Optional: Set sheet size if desired
-            // .presentationDetents([.height(280)])
         }
         .sheet(isPresented: $showingWalkthroughSheet) {
-            WalkthroughView()  // Present the walkthrough view modally
+            WalkthroughView()
         }
 
         // --- Alternative: Trigger a Sheet for Password Input ---
@@ -176,34 +137,7 @@ struct SettingsView: View {
         }
     }
 
-    func manageSubscriptions() {
-            manageSubErrorItem = nil
-            Task {
-                // --- NEW: Get WindowScene manually ---
-                // Find the first active foreground scene that is a UIWindowScene
-                let windowScene = await UIApplication.shared.connectedScenes
-                    .filter { $0.activationState == .foregroundActive }
-                    .first(where: { $0 is UIWindowScene })
-                    as? UIWindowScene
-                // --- END NEW ---
 
-                guard let scene = windowScene else {
-                    print("Window scene could not be retrieved.")
-                    manageSubErrorItem = IdentifiableError(error: NSError(domain: "SettingsView", code: 1, userInfo: [NSLocalizedDescriptionKey: "Aktif pencere (scene) bulunamadı."]))
-                    return
-                }
-
-                // Continue with presenting the sheet
-                do {
-                    try await AppStore.showManageSubscriptions(in: scene)
-                    print("Opened manage subscriptions sheet.")
-                } catch {
-                    print("Failed to show manage subscriptions sheet: \(error)")
-                    manageSubErrorItem = IdentifiableError(error: error)
-                }
-            }
-        }
-    
     func displayTier(_ tier: String?) -> String {
         switch tier?.lowercased() {
         case "premium": return "Premium"

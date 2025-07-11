@@ -17,9 +17,6 @@ struct UnitEditView: View {
     // View Model (using @StateObject for lifecycle)
     @StateObject private var viewModel: UnitEditViewModel
 
-    // --- NEW: Access StoreManager from Environment ---
-    @EnvironmentObject var storeManager: StoreManager
-
     // State for delete confirmation
     @State private var showingDeleteAlert = false
     @State private var itemToShare: ShareItem? = nil
@@ -276,14 +273,9 @@ struct UnitEditView: View {
                 unitName: viewModel.name  // Pass unit name for context
             )
         }
-        .sheet(isPresented: $viewModel.showPaywall) {
-            // Present PaywallView and pass the StoreManager from this view's environment
-            PaywallView()
-                .environmentObject(storeManager)
-        }
         .onAppear {
             // Optional: Reload scans if needed, though they are passed in now
-            // viewModel.loadAvailableScansIfNeeded()
+//            viewModel.loadAvailableScansIfNeeded()
         }
         // Dismiss keyboard when scrolling starts in the Form
         .scrollDismissesKeyboard(.immediately)
@@ -448,9 +440,6 @@ class UnitEditViewModel: ObservableObject {
     @Published var showErrorAlert = false
     @Published var dismissView = false  // Flag to trigger dismissal
 
-    // --- NEW: State to control Paywall presentation ---
-    @Published var showPaywall = false
-
     // Error state for loading scans (if loaded here)
     @Published var scanLoadError: String? = nil
 
@@ -562,52 +551,48 @@ class UnitEditViewModel: ObservableObject {
     }
 
     // --- MODIFIED: saveOrCreatUnit ---
-    func saveOrCreatUnit() async {  // Changed to async as API call might be async now
+    func saveOrCreatUnit() async {
         guard canSaveChanges else { return }
 
         isProcessing = true
         processingMessage =
             (mode == .create) ? "Oluşturuluyor..." : "Kaydediliyor..."
         errorMessage = nil
-        showErrorAlert = false  // Reset error alert
-        showPaywall = false  // Reset paywall state
-        // dismissView = false // Reset dismiss view state? Typically only set true on success.
+        showErrorAlert = false
 
         let fullExternalLinks = externalLinkSuffixes.map { "https://\($0)" }
             .filter {
                 !$0.replacingOccurrences(of: "https://", with: "").isEmpty
             }
 
-        // Prepare data payload
         var payload: [String: Any] = [
-            "name": name.trimmingCharacters(in: .whitespacesAndNewlines),  // Trim whitespace
+            "name": name.trimmingCharacters(in: .whitespacesAndNewlines),
             "address": address.isEmpty ? NSNull() : address,
             "description": description.isEmpty ? NSNull() : description,
             "external_links": fullExternalLinks.isEmpty
                 ? NSNull() : fullExternalLinks,
-            "scan_id": selectedScanId == nil ? NSNull() : selectedScanId!,  // Explicitly use NSNull if nil
+            "scan_id": selectedScanId == nil ? NSNull() : selectedScanId!,
         ]
 
-        print("API Payload: \(payload)")
-
         if mode == .create {
-            // Use the API method with the specific Error type
-            API.shared.createUnit(unitData: payload) { result in  // Result<Unit, APIError>
-                // Ensure UI updates are on main thread
+            API.shared.createUnit(unitData: payload) { result in
                 DispatchQueue.main.async {
-                    self.handleAPIResult(
-                        result: result,
-                        successMessage: "Daire başarıyla oluşturuldu."
-                    )
+                    self.isProcessing = false
+                    switch result {
+                    case .success(let unit):
+                        print("Daire başarıyla oluşturuldu. ID: \(unit.id)")
+                        self.onListNeedsRefresh()
+                        self.dismissView = true
+                    case .failure(let error):
+                        print("API Error (Create): \(error)")
+                        self.errorMessage = error.localizedDescription
+                        self.showErrorAlert = true
+                    }
                 }
             }
         } else if let unitId = unitToEdit?.id {
-            // Assuming updateUnit also needs APIError handling eventually
-            // For now, keep original or update similarly if needed
-            API.shared.updateUnit(unitId: unitId, unitData: payload) {
-                result in  // Assuming Result<Unit, Error> for now
+            API.shared.updateUnit(unitId: unitId, unitData: payload) { result in
                 DispatchQueue.main.async {
-                    // Use a temporary handler or update handleAPIResult if updateUnit changes error type
                     self.isProcessing = false
                     switch result {
                     case .success(let unit):
@@ -656,7 +641,7 @@ class UnitEditViewModel: ObservableObject {
     private func handleAPIResult(
         result: Result<Unit, APIError>,
         successMessage: String
-    ) {  // Takes APIError
+    ) {
         isProcessing = false
         switch result {
         case .success(let unit):
@@ -664,22 +649,9 @@ class UnitEditViewModel: ObservableObject {
             onListNeedsRefresh()
             dismissView = true
         case .failure(let error):
-            // --- Check for the specific subscription error ---
-            if case .subscriptionRequired = error {
-                print(
-                    "Subscription required error caught in ViewModel. Triggering paywall."
-                )
-                errorMessage = nil  // Don't show generic error alert for this case
-                showErrorAlert = false
-                showPaywall = true  // << TRIGGER PAYWALL SHEET >>
-            } else {
-                // Handle other APIErrors
-                print("API Error: \(error.localizedDescription)")
-                errorMessage = error.localizedDescription  // Use localized description from APIError
-                showErrorAlert = true
-                showPaywall = false  // Ensure paywall isn't shown for other errors
-            }
-        // --- End Check ---
+            print("API Error: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            showErrorAlert = true
         }
     }
 
