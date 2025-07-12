@@ -145,7 +145,7 @@ struct ScanningView: View {
                         // Label changes based on the testing flag
                         Text(
                             captureController.forceLocalDownloadForTesting
-                                ? "Save Locally" : "Modeli Tamamla"
+                                ? "Save Locally" : "Tamamla ve Daire Oluştur"
                         )
                         .font(.headline)
                         .padding(.vertical, 12)
@@ -230,6 +230,7 @@ struct ScanningView: View {
                         print(
                             "Upload successful, dismissing scanner via alert."
                         )
+                        NotificationCenter.default.post(name: .scanUploadDidSucceed, object: nil)
                         dismiss()
                     }
                     captureController.currentScanError = nil

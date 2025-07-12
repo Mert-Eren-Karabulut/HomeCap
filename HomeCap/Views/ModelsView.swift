@@ -79,7 +79,10 @@ struct ModelsView: View {
                                     Text(scan.name)
                                         .font(.headline)
                                     // Show filename if path exists
-                                    AddressTextView(latitudeString: scan.latitude, longitudeString: scan.longitude)
+                                    AddressTextView(
+                                        latitudeString: scan.latitude,
+                                        longitudeString: scan.longitude
+                                    )
                                 }
                                 Spacer()
                                 Text(scan.formattedCreatedAt)
@@ -145,6 +148,11 @@ struct ModelsView: View {
                 ScanningEntryView()
             }
         }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .scanUploadDidSucceed)
+        ) { _ in
+            self.isPresentingScanner = false
+        }
     }
 
     // Non-async version for onAppear, button taps, etc.
@@ -196,8 +204,6 @@ struct ModelsView: View {
         }
     }
 }
-
-
 
 #Preview {
     NavigationStack {

@@ -5,12 +5,15 @@
 //  Created by Mert Eren Karabulut on 29.04.2025.
 //
 
-
 // MainTabView.swift
 import SwiftUI
 
+extension Notification.Name {
+    static let scanUploadDidSucceed = Notification.Name("scanUploadDidSucceed")
+}
+
 struct MainTabView: View {
-    @State private var selectedTab: Tab = .anasayfa // Default tab
+    @State private var selectedTab: Tab = .anasayfa  // Default tab
 
     // Enum to represent tabs for type safety
     enum Tab {
@@ -20,8 +23,8 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             // Tab 1: Anasayfa (Home)
-            NavigationStack { // Each tab gets its own Navigation Stack
-                HomeView() // Renamed from DashboardView
+            NavigationStack {  // Each tab gets its own Navigation Stack
+                HomeView()  // Renamed from DashboardView
             }
             .tabItem {
                 Label("Anasayfa", systemImage: "house.fill")
@@ -30,7 +33,7 @@ struct MainTabView: View {
 
             // Tab 2: Modeller (Models)
             NavigationStack {
-                ModelsView() // New View for scans/models
+                ModelsView()  // New View for scans/models
             }
             .tabItem {
                 Label("Modeller", systemImage: "cube.box.fill")
@@ -39,7 +42,7 @@ struct MainTabView: View {
 
             // Tab 3: Daireler (Units)
             NavigationStack {
-                UnitsListView() // New View for units
+                UnitsListView()  // New View for units
             }
             .tabItem {
                 Label("Daireler", systemImage: "building.2.fill")
@@ -48,20 +51,25 @@ struct MainTabView: View {
 
             // Tab 4: Ayarlar (Settings)
             NavigationStack {
-                SettingsView() // New View for settings
+                SettingsView()  // New View for settings
             }
             .tabItem {
                 Label("Ayarlar", systemImage: "gearshape.fill")
             }
             .tag(Tab.ayarlar)
         }
-         // Pass AuthManager down if needed by child views (e.g., SettingsView)
-         // .environmentObject(AuthManager.shared) // If using shared instance
-         // Or rely on it being passed from HomeCapApp
+        // Pass AuthManager down if needed by child views (e.g., SettingsView)
+        // .environmentObject(AuthManager.shared) // If using shared instance
+        // Or rely on it being passed from HomeCapApp
+        .onReceive(
+            NotificationCenter.default.publisher(for: .scanUploadDidSucceed)
+        ) { _ in
+            self.selectedTab = .daireler
+        }
     }
 }
 
 #Preview {
     MainTabView()
-        .environmentObject(AuthManager()) // Provide for preview
+        .environmentObject(AuthManager())  // Provide for preview
 }
